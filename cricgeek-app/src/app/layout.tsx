@@ -16,7 +16,7 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const aboutOnly = process.env.ABOUT_ONLY_DEPLOYMENT === "true";
+  const aboutOnly = process.env.ABOUT_ONLY_DEPLOYMENT !== "false";
 
   return (
     <html lang="en" className="dark">

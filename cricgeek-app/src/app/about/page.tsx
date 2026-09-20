@@ -75,26 +75,6 @@ function AccentRule({ className = "" }: { className?: string }) {
   );
 }
 
-/* ─── Dot row for data-style decoration ──────────────────────────────────── */
-function DataDots({ className = "" }: { className?: string }) {
-  return (
-    <div
-      aria-hidden="true"
-      className={`flex items-center gap-1.5 ${className}`}
-    >
-      {[...Array(5)].map((_, i) => (
-        <span
-          key={i}
-          className="h-1 w-1 rounded-full"
-          style={{
-            background: `rgba(34,197,94,${0.15 + i * 0.12})`,
-          }}
-        />
-      ))}
-    </div>
-  );
-}
-
 /* ─── Eyebrow label ───────────────────────────────────────────────────────── */
 function Eyebrow({ children }: { children: React.ReactNode }) {
   return (
@@ -230,7 +210,7 @@ export default function AboutPage() {
                     <a
                       href="mailto:cricgeek18@gmail.com"
                       id="contact-email-link"
-                      className="group min-w-0 text-base sm:text-lg font-bold text-cg-green break-all leading-snug hover:underline underline-offset-4 decoration-cg-green/50 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-cg-green focus-visible:ring-offset-2 focus-visible:ring-offset-cg-dark-2 rounded"
+                      className="group min-w-0 whitespace-nowrap text-sm sm:text-base font-bold tracking-tight text-cg-green leading-snug hover:underline underline-offset-4 decoration-cg-green/50 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-cg-green focus-visible:ring-offset-2 focus-visible:ring-offset-cg-dark-2 rounded"
                       aria-label="Send email to cricgeek18@gmail.com"
                     >
                       cricgeek18@gmail.com

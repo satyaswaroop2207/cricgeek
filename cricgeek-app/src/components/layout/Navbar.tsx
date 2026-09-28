@@ -2,7 +2,11 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
+import NotificationBell from "@/components/layout/NotificationBell";
+import { useLocalCommunitySession } from "@/hooks/useLocalCommunitySession";
+import { signOutLocalUser } from "@/lib/communities/local-community-service";
 import {
   Menu,
   X,
@@ -35,55 +39,31 @@ interface UserSession {
   role: string;
 }
 
-interface NavbarProps {
-  aboutOnly?: boolean;
-}
-
-export default function Navbar({ aboutOnly = false }: NavbarProps) {
+export default function Navbar() {
+  const router = useRouter();
   const { data: session, status } = useSession();
+  const { user: localUser } = useLocalCommunitySession();
   const [isOpen, setIsOpen] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
-  const user = (session?.user as UserSession | undefined) ?? null;
-  const authLoading = status === "loading";
+  const sessionUser = (session?.user as UserSession | undefined) ?? null;
+  const user = localUser
+    ? { id: localUser.id, name: localUser.name, email: localUser.email, role: "user" }
+    : sessionUser;
+  const authLoading = status === "loading" && !localUser;
 
   const handleSignOut = () => {
     setShowDropdown(false);
+    if (localUser) {
+      signOutLocalUser();
+      router.replace("/");
+      return;
+    }
     void signOut({ redirectTo: "/" });
   };
 
   const visibleNavLinks = user?.role === "admin"
     ? [...navLinks, { href: "/admin", label: "Admin", icon: Shield }]
     : navLinks;
-
-  if (aboutOnly) {
-    return (
-      <nav className="bg-cg-dark border-b border-gray-800 sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="min-h-16 py-2 flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
-            <Link href="/about" className="flex items-center gap-2 shrink-0">
-              <div className="w-10 h-10 bg-cg-green rounded-lg flex items-center justify-center">
-                <span className="text-black font-black text-lg">CG</span>
-              </div>
-              <span className="text-white font-bold text-xl">CricGeek</span>
-            </Link>
-
-            <div className="hidden h-6 w-px shrink-0 bg-cg-green/35 sm:block" aria-hidden="true" />
-
-            <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:flex-wrap sm:items-center">
-              {['LIVE COVERAGE', 'MATCH INSIGHTS', 'STATS', 'FAN COVERAGE'].map((tag) => (
-                <span
-                  key={tag}
-                  className="whitespace-nowrap rounded border border-cg-green/30 bg-cg-green/[0.04] px-2.5 py-1 text-center text-[10px] font-bold uppercase leading-4 tracking-[0.12em] text-cg-gray-200"
-                >
-                  {tag}
-                </span>
-              ))}
-            </div>
-          </div>
-        </div>
-      </nav>
-    );
-  }
 
   return (
     <nav className="bg-cg-dark border-b border-gray-800 sticky top-0 z-50">
@@ -123,7 +103,8 @@ export default function Navbar({ aboutOnly = false }: NavbarProps) {
               <div className="h-10 w-28 animate-pulse rounded-xl border border-gray-700 bg-cg-dark-2" />
             ) : user ? (
               /* Logged in — User Dropdown */
-              <div className="relative">
+              <div className="relative flex items-center gap-2">
+                <NotificationBell />
                 <button
                   onClick={() => setShowDropdown(!showDropdown)}
                   className="flex items-center gap-2 bg-cg-dark-2 border border-gray-700 rounded-xl px-3 py-1.5 hover:border-gray-500 transition-all"
@@ -140,7 +121,7 @@ export default function Navbar({ aboutOnly = false }: NavbarProps) {
                 {showDropdown && (
                   <>
                     <div className="fixed inset-0 z-40" onClick={() => setShowDropdown(false)} />
-                    <div className="absolute right-0 mt-2 w-52 bg-cg-dark-2 border border-gray-700 rounded-xl shadow-xl z-50 overflow-hidden">
+                    <div className="absolute right-0 top-full mt-2 w-52 bg-cg-dark-2 border border-gray-700 rounded-xl shadow-xl z-50 overflow-hidden">
                       <div className="px-4 py-3 border-b border-gray-800">
                         <p className="text-sm font-medium text-white truncate">{user.name}</p>
                         <p className="text-[10px] text-gray-500 truncate">{user.email}</p>
@@ -150,7 +131,7 @@ export default function Navbar({ aboutOnly = false }: NavbarProps) {
                           <User size={14} /> My Profile
                         </Link>
                         <Link href="/blog/write" onClick={() => setShowDropdown(false)} className="flex items-center gap-2 px-4 py-2.5 text-sm text-gray-300 hover:bg-gray-800 hover:text-white transition-all">
-                          <PenSquare size={14} /> {user.role === "user" ? "Become a Writer" : "Write Expression"}
+                          <PenSquare size={14} /> Write Expression
                         </Link>
                         <Link href="/leaderboard" onClick={() => setShowDropdown(false)} className="flex items-center gap-2 px-4 py-2.5 text-sm text-gray-300 hover:bg-gray-800 hover:text-white transition-all">
                           <Trophy size={14} /> Leaderboard
@@ -224,20 +205,23 @@ export default function Navbar({ aboutOnly = false }: NavbarProps) {
               <div className="px-3 py-3 text-sm text-gray-500">Checking session...</div>
             ) : user ? (
               <>
-                <div className="flex items-center gap-3 px-3 py-3">
-                  <div className="w-9 h-9 rounded-full bg-cg-green/20 flex items-center justify-center text-sm font-bold text-cg-green">
-                    {user.name.charAt(0).toUpperCase()}
+                <div className="flex items-center justify-between gap-3 px-3 py-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-full bg-cg-green/20 flex items-center justify-center text-sm font-bold text-cg-green">
+                      {user.name.charAt(0).toUpperCase()}
+                    </div>
+                    <div>
+                      <p className="text-white text-sm font-medium">{user.name}</p>
+                      <p className="text-[10px] text-gray-500">{user.email}</p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-white text-sm font-medium">{user.name}</p>
-                    <p className="text-[10px] text-gray-500">{user.email}</p>
-                  </div>
+                  <NotificationBell />
                 </div>
                 <Link href={`/writer/${user.id}`} onClick={() => setIsOpen(false)} className="text-gray-300 hover:text-white px-3 py-3 rounded-lg text-base font-medium transition-all flex items-center gap-2">
                   <User size={18} /> My Profile
                 </Link>
                 <Link href="/blog/write" onClick={() => setIsOpen(false)} className="text-gray-300 hover:text-white px-3 py-3 rounded-lg text-base font-medium transition-all flex items-center gap-2">
-                  <PenSquare size={18} /> {user.role === "user" ? "Become a Writer" : "Write Expression"}
+                  <PenSquare size={18} /> Write Expression
                 </Link>
                 {user.role === "admin" && (
                   <Link href="/admin" onClick={() => setIsOpen(false)} className="text-cg-green hover:text-cg-green-dark px-3 py-3 rounded-lg text-base font-medium transition-all flex items-center gap-2">

@@ -1,18 +1,20 @@
 "use client";
 
-import { useState } from "react";
-import { useSession } from "next-auth/react";
+import { FormEvent, useMemo, useState } from "react";
 import { Users, FileText, Calendar, ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import AdSlot from "@/components/ads/AdSlot";
-import { Community, SAMPLE_POSTS } from "../mockData";
-
-interface UserSession {
-  id: string;
-  name: string;
-  email: string;
-  role: string;
-}
+import CommunityActions from "@/components/communities/CommunityActions";
+import JoinRequestsPanel from "@/components/communities/JoinRequestsPanel";
+import { Community } from "../mockData";
+import { useLocalCommunitySession } from "@/hooks/useLocalCommunitySession";
+import {
+  addCommunityPost,
+  getCommunityHead,
+  getCommunityPosts,
+  getExtraMemberCount,
+  isCommunityMember,
+} from "@/lib/communities/local-community-service";
 
 function formatNumber(num: number): string {
   if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
@@ -20,20 +22,42 @@ function formatNumber(num: number): string {
   return num.toString();
 }
 
-export default function CommunityDetailClient({ community }: { community: Community }) {
-  const { data: session } = useSession();
-  const user = (session?.user as UserSession | undefined) ?? null;
-  const [joined, setJoined] = useState(false);
+function formatMemberCount(base: number, extra: number): string {
+  const total = base + extra;
+  if (extra > 0) return total.toLocaleString();
+  return formatNumber(base);
+}
 
-  // Derive matching posts utilizing the mocked data structure
-  const posts = SAMPLE_POSTS.filter(p => p.communitySlug === community.slug);
-  
-  // Checking for non-reader role as per CricGeek's auth pattern
-  const isWriter = !!user && user.role !== "user";
+export default function CommunityDetailClient({ community }: { community: Community }) {
+  const { user, snapshot } = useLocalCommunitySession();
+  const extraMembers = getExtraMemberCount(community.id);
+  const head = getCommunityHead(community);
+  const posts = getCommunityPosts(community.slug);
+  const canContribute = !!user && isCommunityMember(community.id, user.id);
+  const [title, setTitle] = useState("");
+  const [summary, setSummary] = useState("");
+
+  const postCountLabel = useMemo(() => {
+    const extras = posts.length;
+    return extras > community.posts ? extras : community.posts;
+  }, [community.posts, posts.length]);
+
+  const handleContribute = (event: FormEvent) => {
+    event.preventDefault();
+    if (!user || !title.trim() || !summary.trim()) return;
+    addCommunityPost({
+      community,
+      author: user,
+      title: title.trim(),
+      summary: summary.trim(),
+    });
+    setTitle("");
+    setSummary("");
+  };
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top,rgba(34,197,94,0.08),transparent_40%),linear-gradient(180deg,#060606,#0a0a0a)] text-white">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div className="min-h-screen bg-[radial-gradient(circle_at_top,rgba(34,197,94,0.08),transparent_40%),linear-gradient(180deg,#060606,#0a0a0a)] text-white" data-state={snapshot}>
+      <div className="mx-auto max-w-[1440px] px-4 sm:px-6 xl:px-20 py-8">
         
         <div className="mb-6">
           <Link href="/communities" className="inline-flex items-center gap-2 text-sm text-gray-400 hover:text-cg-green transition-all">
@@ -41,13 +65,9 @@ export default function CommunityDetailClient({ community }: { community: Commun
           </Link>
         </div>
 
-        <div className="xl:grid xl:grid-cols-[300px_1fr_300px] xl:gap-8 flex flex-col">
-          
-          <aside className="hidden xl:flex flex-col gap-6 sticky top-24 h-max">
-            <AdSlot slot="community-detail-left-1" size="rectangle" placeholder />
-          </aside>
+        <div className="xl:grid xl:grid-cols-[minmax(0,1fr)_300px] xl:gap-8 flex flex-col">
 
-          <main className="flex-1 w-full max-w-4xl mx-auto flex flex-col gap-8">
+          <main className="flex-1 w-full min-w-0 flex flex-col gap-8">
             
             {/* Community Header Block */}
             <section className="bg-[linear-gradient(160deg,rgba(17,17,17,0.95),rgba(12,28,18,0.9))] border border-gray-800 rounded-3xl p-6 sm:p-8 shadow-sm">
@@ -62,31 +82,26 @@ export default function CommunityDetailClient({ community }: { community: Commun
                   </p>
                   
                   <div className="mt-6 flex flex-wrap items-center gap-6 text-sm text-gray-400">
+                    {head && (
+                      <div className="flex items-center gap-2">
+                        <span>Head:</span>
+                        <Link href={`/writer/${head.id}`} className="font-semibold text-white hover:text-cg-green">
+                          {head.name}
+                        </Link>
+                      </div>
+                    )}
                     <div className="flex items-center gap-2">
                       <Users size={18} className="text-gray-500" />
-                      <span><strong className="text-white text-base">{formatNumber(community.followers)}</strong> Members</span>
+                      <span><strong className="text-white text-base">{formatMemberCount(community.followers, extraMembers)}</strong> Members</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <FileText size={18} className="text-gray-500" />
-                      <span><strong className="text-white text-base">{formatNumber(community.posts)}</strong> Posts</span>
+                      <span><strong className="text-white text-base">{formatNumber(postCountLabel)}</strong> Posts</span>
                     </div>
                   </div>
                 </div>
 
-                {isWriter && (
-                  <div className="min-w-[140px]">
-                    <button 
-                      onClick={() => setJoined(!joined)}
-                      className={`w-full py-3 px-6 rounded-xl text-sm font-bold transition-all ${
-                        joined 
-                          ? "bg-gray-800 text-white border border-gray-700 hover:bg-gray-700"
-                          : "bg-cg-green text-black hover:bg-cg-green-dark"
-                      }`}
-                    >
-                      {joined ? "Joined" : "Join Community"}
-                    </button>
-                  </div>
-                )}
+                <CommunityActions community={community} />
               </div>
             </section>
             
@@ -94,6 +109,8 @@ export default function CommunityDetailClient({ community }: { community: Commun
             <div className="xl:hidden w-full flex justify-center my-2">
               <AdSlot slot="community-detail-mobile-1" size="mobile-banner" placeholder />
             </div>
+
+            <JoinRequestsPanel community={community} />
 
             {/* Popular Writers Line up */}
             <section className="bg-white/[0.02] border border-gray-800 rounded-3xl p-6">
@@ -109,6 +126,39 @@ export default function CommunityDetailClient({ community }: { community: Commun
                   ))}
                </div>
             </section>
+
+            {canContribute && (
+              <section className="bg-white/[0.02] border border-gray-800 rounded-3xl p-6">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+                  <h2 className="text-sm font-bold uppercase tracking-widest text-gray-500">Write in this community</h2>
+                  <Link href="/blog/write" className="text-xs font-semibold text-cg-green hover:underline">
+                    Or write an independent expression
+                  </Link>
+                </div>
+                <form onSubmit={handleContribute} className="flex flex-col gap-3">
+                  <input
+                    value={title}
+                    onChange={(event) => setTitle(event.target.value)}
+                    placeholder="Discussion title"
+                    className="w-full bg-black/40 border border-gray-700 rounded-xl px-4 py-3 text-sm text-white placeholder:text-gray-600 outline-none focus:border-cg-green"
+                  />
+                  <textarea
+                    value={summary}
+                    onChange={(event) => setSummary(event.target.value)}
+                    placeholder="Share a community discussion..."
+                    rows={3}
+                    className="w-full bg-black/40 border border-gray-700 rounded-xl px-4 py-3 text-sm text-white placeholder:text-gray-600 outline-none focus:border-cg-green resize-none"
+                  />
+                  <button
+                    type="submit"
+                    disabled={!title.trim() || !summary.trim()}
+                    className="self-start bg-cg-green text-black text-sm font-bold px-4 py-2 rounded-xl hover:bg-cg-green-dark disabled:opacity-50"
+                  >
+                    Publish to community
+                  </button>
+                </form>
+              </section>
+            )}
 
             {/* Discussions / Related Content */}
             <section className="flex flex-col gap-5">

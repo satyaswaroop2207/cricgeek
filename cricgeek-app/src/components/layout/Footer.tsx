@@ -14,7 +14,6 @@ const footerLinks = {
   ],
   Company: [
     { href: "/contact", label: "Contact Us" },
-    { href: "/about", label: "About CricGeek" },
   ],
 };
 

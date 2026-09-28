@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { getSession, signIn } from "next-auth/react";
 import { Eye, EyeOff, Mail, Lock, ArrowRight, Chrome } from "lucide-react";
+import { listLocalUsers, signInLocalUser } from "@/lib/communities/local-community-service";
 
 const CRICKET_FACTS = [
   "Don Bradman's batting average of 99.94 remains the greatest in Test history.",
@@ -74,6 +75,16 @@ function LoginContent() {
       setError("Google sign-in could not be started. Please try again.");
       setGoogleLoading(false);
     }
+  };
+
+  const handleDemoSignIn = (userId: string) => {
+    const user = signInLocalUser(userId);
+    if (!user) {
+      setError("Could not sign in with that demo account.");
+      return;
+    }
+    router.replace(next || redirect || "/communities");
+    router.refresh();
   };
 
   return (
@@ -210,6 +221,23 @@ function LoginContent() {
               )}
             </button>
           </form>
+
+          <div className="mt-6">
+            <p className="text-xs font-semibold uppercase tracking-widest text-gray-500 mb-3">Sign in as</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {listLocalUsers().map((demoUser) => (
+                <button
+                  key={demoUser.id}
+                  type="button"
+                  onClick={() => handleDemoSignIn(demoUser.id)}
+                  className="text-left bg-cg-dark-3 border border-gray-700 rounded-xl px-3 py-2.5 hover:border-gray-500 hover:bg-gray-800 transition-all"
+                >
+                  <span className="block text-sm font-semibold text-white">{demoUser.name}</span>
+                  <span className="block text-[11px] text-gray-500">@{demoUser.username}</span>
+                </button>
+              ))}
+            </div>
+          </div>
 
           {/* Divider */}
           <div className="flex items-center gap-3 my-6">

@@ -12,7 +12,7 @@ git push origin main
 
 ## 2. Provision the production database
 
-Use a hosted MySQL database.
+Use a hosted SQL Server database supported by Prisma's SQL Server connector.
 
 Required:
 - create a database named `cricgeek` or equivalent

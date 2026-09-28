@@ -1,12 +1,14 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { ArrowLeft, Trophy, Award, Target, Eye, FileText, TrendingUp } from "lucide-react";
+import { ArrowLeft, Trophy, Award, Target, Eye, FileText, TrendingUp, Wallet, Calendar, Flame, ChevronUp } from "lucide-react";
 import Link from "next/link";
 import FollowWriterButton from "@/components/writer/FollowWriterButton";
 import WriterDNAChart from "@/components/writer/WriterDNAChart";
 import ScoreRing from "@/components/writer/ScoreRing";
+import AdSlot from "@/components/ads/AdSlot";
 import { ARCHETYPE_CONFIG, getScoreColor } from "@/components/writer/WriterProfileCard";
+import { getUserWriterProfile } from "@/lib/communities/local-community-service";
 import { use } from "react";
 
 interface WriterData {
@@ -22,7 +24,8 @@ interface WriterData {
   dna: { analyst: number; fan: number; storyteller: number; debater: number };
   badges: { badge: string; title: string; description: string; tier: string; earnedAt: string }[];
   achievements: { achievement: string; title: string; description: string; milestone: number; earnedAt: string }[];
-  recentBlogs: { id: string; title: string; slug: string; views: number; runs: number; createdAt: string; score: { bqs: number } | null }[];
+  recentBlogs: { id: string; title: string; slug: string; views: number; runs: number; createdAt: string; score: { bqs: number; processingStatus?: string } | null }[];
+  communities?: string[];
 }
 
 const TIER_COLORS: Record<string, string> = {
@@ -37,6 +40,7 @@ export default function WriterProfilePage({ params }: { params: Promise<{ id: st
   const [writer, setWriter] = useState<WriterData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [showPopularExpressions, setShowPopularExpressions] = useState(false);
 
   useEffect(() => {
     async function fetchWriter() {
@@ -46,13 +50,23 @@ export default function WriterProfilePage({ params }: { params: Promise<{ id: st
           const data = await res.json();
           setWriter(data);
         } else {
-          const data = await res.json().catch(() => null);
-          setError(data?.error || "Writer not found");
-          setWriter(null);
+          const localWriter = getUserWriterProfile(resolvedParams.id);
+          if (localWriter) {
+            setWriter(localWriter);
+          } else {
+            const data = await res.json().catch(() => null);
+            setError(data?.error || "Writer not found");
+            setWriter(null);
+          }
         }
       } catch {
-        setError("Writer profile could not be loaded");
-        setWriter(null);
+        const localWriter = getUserWriterProfile(resolvedParams.id);
+        if (localWriter) {
+          setWriter(localWriter);
+        } else {
+          setError("Writer profile could not be loaded");
+          setWriter(null);
+        }
       } finally {
         setLoading(false);
       }
@@ -95,12 +109,26 @@ export default function WriterProfilePage({ params }: { params: Promise<{ id: st
 
   const config = ARCHETYPE_CONFIG[writer.profile.archetype] || ARCHETYPE_CONFIG.rookie;
   const xpProgress = writer.profile.xp % 100;
+  const earningsPerThousandViews = 80;
+  const totalEarnings = Math.round((writer.profile.totalViews / 1000) * earningsPerThousandViews);
+  const currentMonth = new Date().getMonth();
+  const currentYear = new Date().getFullYear();
+  const thisMonthBlogs = writer.recentBlogs.filter((blog) => {
+    const createdAt = new Date(blog.createdAt);
+    return createdAt.getMonth() === currentMonth && createdAt.getFullYear() === currentYear;
+  });
+  const thisMonthViews = thisMonthBlogs.reduce((total, blog) => total + blog.views, 0);
+  const thisMonthEarnings = Math.round((thisMonthViews / 1000) * earningsPerThousandViews);
+  const popularBlogs = [...writer.recentBlogs].sort((a, b) => b.views - a.views).slice(0, 3);
 
   return (
-    <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8">
+    <div className="max-w-[1440px] mx-auto px-4 sm:px-6 xl:px-20 py-8">
       <Link href="/leaderboard" className="text-gray-400 hover:text-white text-sm flex items-center gap-1 mb-6">
         <ArrowLeft size={14} /> Back to Leaderboard
       </Link>
+
+      <div className="xl:grid xl:grid-cols-[minmax(0,1fr)_300px] xl:gap-8 flex flex-col">
+        <main className="max-w-5xl w-full min-w-0">
 
       {/* Header */}
       <div className="bg-cg-dark-2 border border-gray-800 rounded-2xl p-6 sm:p-8 mb-6">
@@ -130,6 +158,11 @@ export default function WriterProfilePage({ params }: { params: Promise<{ id: st
               )}
             </p>
             {writer.bio && <p className="text-gray-400 text-sm mt-2">{writer.bio}</p>}
+            {writer.communities && writer.communities.length > 0 && (
+              <p className="text-xs text-gray-500 mt-2">
+                Communities: {writer.communities.join(", ")}
+              </p>
+            )}
             <div className="mt-4 flex flex-wrap items-center gap-3">
               <span className="rounded-full border border-cg-green/20 bg-cg-green/10 px-3 py-1 text-xs font-semibold text-cg-green">
                 {(writer.role || "user").toUpperCase()}
@@ -244,7 +277,7 @@ export default function WriterProfilePage({ params }: { params: Promise<{ id: st
             </h2>
             <div className="space-y-3">
               {writer.recentBlogs.map((blog) => (
-                <Link key={blog.id} href={`/blog/${blog.slug}`} className="block group">
+                <Link key={blog.id} href={blog.slug.startsWith("/") ? blog.slug : `/blog/${blog.slug}`} className="block group">
                   <div className="flex items-center gap-4 p-3 rounded-lg hover:bg-cg-dark-3/50 transition-all">
                     {blog.score?.processingStatus === "processing" ? (
                       <div className="w-10 h-10 rounded-lg flex flex-col items-center justify-center text-[9px] font-black uppercase tracking-[0.16em] border border-amber-500/30 bg-amber-500/10 text-amber-300 shrink-0">
@@ -305,6 +338,108 @@ export default function WriterProfilePage({ params }: { params: Promise<{ id: st
             )}
           </div>
         </div>
+      </div>
+
+      <div className="flex flex-col">
+      <section className="order-2 mb-6 rounded-lg border border-gray-800 bg-cg-dark-2 p-4">
+        <button
+          type="button"
+          onClick={() => setShowPopularExpressions((isOpen) => !isOpen)}
+          aria-expanded={showPopularExpressions}
+          className="flex w-full items-center justify-between text-left"
+        >
+          <span className="flex items-center gap-2">
+            <Flame size={18} className="text-orange-400" />
+            <span>
+              <span className="block text-sm font-bold text-white">Popular Expressions</span>
+              <span className="block text-[10px] text-gray-500">Your top performing expressions by views</span>
+            </span>
+          </span>
+          <ChevronUp size={16} className={`text-gray-500 transition-transform ${showPopularExpressions ? "rotate-180" : ""}`} />
+        </button>
+        {showPopularExpressions && (
+          <div className="mt-3 divide-y divide-gray-800/70">
+            {popularBlogs.map((blog, index) => (
+              <Link key={blog.id} href={blog.slug.startsWith("/") ? blog.slug : `/blog/${blog.slug}`} className="flex items-center gap-3 py-2 first:pt-0 last:pb-0">
+                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-cg-dark-3 text-[10px] font-bold text-white">{index + 1}</span>
+                <span className="min-w-0 flex-1 truncate text-[11px] text-gray-200">{blog.title}</span>
+                <span className="flex shrink-0 items-center gap-1 text-[10px] text-gray-400"><Eye size={11} /> {blog.views.toLocaleString()}</span>
+                <span className="w-16 shrink-0 text-right text-[10px] font-bold text-cg-green">₹{Math.round((blog.views / 1000) * earningsPerThousandViews).toLocaleString()}</span>
+              </Link>
+            ))}
+          </div>
+        )}
+      </section>
+
+      {/* My Earnings is intentionally the final profile section. */}
+      <section className="order-1 mb-6 border-t border-gray-800 pt-5">
+        <div className="mb-3 flex items-start gap-3">
+          <Wallet size={24} className="mt-0.5 text-cg-green" />
+          <div>
+            <h2 className="text-lg font-bold text-white">My Earnings</h2>
+            <p className="text-[10px] text-gray-500">Track your earnings from your expressions. You earn ₹{earningsPerThousandViews} for every 1,000 views.</p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          {[
+            {
+              title: "Total Earnings",
+              subtitle: "All time earnings from your expressions",
+              amount: totalEarnings,
+              expressionsLabel: "Total Expressions",
+              expressions: writer.profile.totalBlogs,
+              viewsLabel: "Total Views",
+              views: writer.profile.totalViews,
+              icon: Wallet,
+            },
+            {
+              title: "This Month",
+              subtitle: "Earnings from your expressions this month",
+              amount: thisMonthEarnings,
+              expressionsLabel: "Expressions",
+              expressions: thisMonthBlogs.length,
+              viewsLabel: "Views",
+              views: thisMonthViews,
+              icon: Calendar,
+            },
+          ].map((card) => (
+            <div key={card.title} className="rounded-lg border border-gray-800 bg-cg-dark-2 p-3">
+              <div className="flex items-center gap-3">
+                <card.icon size={16} className="text-cg-green" />
+                <div>
+                  <h3 className="text-xs font-bold text-white">{card.title}</h3>
+                  <p className="text-[9px] text-gray-500">{card.subtitle}</p>
+                </div>
+              </div>
+              <div className="my-2 rounded-md border border-cg-green/70 bg-cg-green/10 py-2 text-center">
+                <p className="text-2xl font-black text-cg-green">₹{card.amount.toLocaleString()}</p>
+              </div>
+              <div className="space-y-1 text-[10px] text-gray-400">
+                <div className="flex items-center justify-between">
+                  <span className="flex items-center gap-2"><FileText size={12} /> {card.expressionsLabel}</span>
+                  <span className="font-bold text-gray-200">{card.expressions.toLocaleString()}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="flex items-center gap-2"><Eye size={12} /> {card.viewsLabel}</span>
+                  <span className="font-bold text-gray-200">{card.views.toLocaleString()}</span>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      </div>
+        </main>
+
+        <aside className="hidden xl:block w-[300px]" aria-label="Advertisements">
+          <div className="sticky top-24 flex flex-col gap-6">
+            <AdSlot slot="writer-profile-right-1" size="rectangle" placeholder />
+            <AdSlot slot="writer-profile-right-2" size="rectangle" placeholder />
+            <AdSlot slot="writer-profile-right-3" size="rectangle" placeholder />
+          </div>
+        </aside>
       </div>
     </div>
   );

@@ -1,18 +1,13 @@
 "use client";
 
 import { useDeferredValue, useState } from "react";
-import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { Search as SearchIcon, Users } from "lucide-react";
 import AdSlot from "@/components/ads/AdSlot";
+import CommunityActions from "@/components/communities/CommunityActions";
 import { SAMPLE_COMMUNITIES, Community } from "./mockData";
-
-interface UserSession {
-  id: string;
-  name: string;
-  email: string;
-  role: string;
-}
+import { getExtraMemberCount } from "@/lib/communities/local-community-service";
+import { useLocalCommunitySession } from "@/hooks/useLocalCommunitySession";
 
 function formatNumber(num: number): string {
   if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
@@ -20,9 +15,15 @@ function formatNumber(num: number): string {
   return num.toString();
 }
 
-function CommunityCard({ community, user }: { community: Community; user: UserSession | null }) {
-  const [joined, setJoined] = useState(false);
+function formatMemberCount(base: number, extra: number): string {
+  const total = base + extra;
+  if (extra > 0) return total.toLocaleString();
+  return formatNumber(base);
+}
+
+function CommunityCard({ community }: { community: Community }) {
   const router = useRouter();
+  const extraMembers = getExtraMemberCount(community.id);
 
   const handleCardClick = () => {
     router.push(`/communities/${community.slug}`);
@@ -34,13 +35,6 @@ function CommunityCard({ community, user }: { community: Community; user: UserSe
       handleCardClick();
     }
   };
-
-  const handleJoinClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setJoined(!joined);
-  };
-
-  const isWriter = !!user && user.role !== "user";
 
   return (
     <article 
@@ -64,7 +58,7 @@ function CommunityCard({ community, user }: { community: Community; user: UserSe
           <div className="mt-4 flex flex-wrap items-center gap-4 text-sm text-gray-500">
             <div className="flex items-center gap-1.5">
               <Users size={16} />
-              <span><strong className="text-gray-300">{formatNumber(community.followers)}</strong> Members</span>
+              <span><strong className="text-gray-300">{formatMemberCount(community.followers, extraMembers)}</strong> Members</span>
             </div>
             <div className="flex items-center gap-1.5">
               <span><strong className="text-gray-300">{formatNumber(community.posts)}</strong> Posts</span>
@@ -88,28 +82,16 @@ function CommunityCard({ community, user }: { community: Community; user: UserSe
           )}
         </div>
         
-        {isWriter && (
-          <div className="flex sm:flex-col gap-3 min-w-[120px]">
-            <button 
-              onClick={handleJoinClick}
-              className={`w-full py-2.5 px-4 rounded-xl text-sm font-bold transition-all ${
-                joined 
-                  ? "bg-gray-800 text-white border border-gray-700 hover:bg-gray-700"
-                  : "bg-cg-green text-black hover:bg-cg-green-dark"
-              }`}
-            >
-              {joined ? "Joined" : "Join"}
-            </button>
-          </div>
-        )}
+        <div onClick={(event) => event.stopPropagation()}>
+          <CommunityActions community={community} />
+        </div>
       </div>
     </article>
   );
 }
 
 export default function CommunitiesClient() {
-  const { data: session } = useSession();
-  const user = (session?.user as UserSession | undefined) ?? null;
+  useLocalCommunitySession();
   const [searchQuery, setSearchQuery] = useState("");
   const deferredQuery = useDeferredValue(searchQuery);
 
@@ -126,16 +108,11 @@ export default function CommunitiesClient() {
 
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_top,rgba(34,197,94,0.08),transparent_40%),linear-gradient(180deg,#060606,#0a0a0a)] text-white">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="mx-auto max-w-[1440px] px-4 sm:px-6 xl:px-20 py-8">
         
-        <div className="xl:grid xl:grid-cols-[300px_1fr_300px] xl:gap-8 flex flex-col">
-          
-          <aside className="hidden xl:flex flex-col gap-6 sticky top-24 h-max">
-            <AdSlot slot="communities-left-1" size="rectangle" placeholder />
-            <AdSlot slot="communities-left-2" size="half-page" placeholder />
-          </aside>
+        <div className="xl:grid xl:grid-cols-[minmax(0,1fr)_300px] xl:gap-8 flex flex-col">
 
-          <main className="flex-1 w-full max-w-4xl mx-auto flex flex-col gap-8">
+          <main className="flex-1 w-full min-w-0 flex flex-col gap-8">
             
             <section className="bg-white/[0.02] border border-gray-800 rounded-3xl p-6 sm:p-8">
               <div className="inline-flex items-center gap-2 rounded-full border border-cg-green/20 bg-cg-green/10 px-4 py-2 text-xs font-semibold uppercase tracking-[0.26em] text-cg-green mb-6">
@@ -172,7 +149,7 @@ export default function CommunitiesClient() {
 
               {filteredCommunities.length > 0 ? (
                 filteredCommunities.map((community) => (
-                  <CommunityCard key={community.id} community={community} user={user} />
+                  <CommunityCard key={community.id} community={community} />
                 ))
               ) : (
                 <div className="rounded-3xl border border-dashed border-gray-700 bg-white/[0.01] p-12 text-center">
@@ -199,9 +176,12 @@ export default function CommunitiesClient() {
 
           </main>
 
-          <aside className="hidden xl:flex flex-col gap-6 sticky top-24 h-max">
-            <AdSlot slot="communities-right-1" size="rectangle" placeholder />
-            <AdSlot slot="communities-right-2" size="rectangle" placeholder />
+          <aside className="hidden xl:block w-[300px]">
+            <div className="sticky top-24 flex flex-col gap-6">
+              <AdSlot slot="communities-right-1" size="rectangle" placeholder />
+              <AdSlot slot="communities-right-2" size="rectangle" placeholder />
+              <AdSlot slot="communities-right-3" size="half-page" placeholder />
+            </div>
           </aside>
           
         </div>

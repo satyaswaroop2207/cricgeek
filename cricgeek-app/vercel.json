@@ -10,7 +10,6 @@
       "root": "insights_service",
       "entrypoint": "main.py",
       "framework": "fastapi",
-      "memory": 2048,
       "maxDuration": 120,
       "includeFiles": [
         "t20_insights.py",

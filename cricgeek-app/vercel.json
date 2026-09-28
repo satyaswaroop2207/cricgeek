@@ -3,12 +3,10 @@
   "services": {
     "web": {
       "entrypoint": ".",
-      "routePrefix": "/",
       "framework": "nextjs"
     },
     "insights": {
       "entrypoint": "insights_service/main.py",
-      "routePrefix": "/_insights",
       "framework": "fastapi",
       "memory": 2048,
       "maxDuration": 120,
@@ -19,5 +17,25 @@
         "insights_service/outputs/**"
       ]
     }
-  }
+  },
+  "rewrites": [
+    {
+      "source": "/_insights",
+      "destination": {
+        "service": "insights"
+      }
+    },
+    {
+      "source": "/_insights/:path*",
+      "destination": {
+        "service": "insights"
+      }
+    },
+    {
+      "source": "/:path*",
+      "destination": {
+        "service": "web"
+      }
+    }
+  ]
 }

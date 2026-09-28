@@ -2,19 +2,21 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "services": {
     "web": {
+      "root": ".",
       "entrypoint": ".",
       "framework": "nextjs"
     },
     "insights": {
-      "entrypoint": "insights_service/main.py",
+      "root": "insights_service",
+      "entrypoint": "main.py",
       "framework": "fastapi",
       "memory": 2048,
       "maxDuration": 120,
       "includeFiles": [
-        "insights_service/t20_insights.py",
-        "insights_service/cricket_metrics.py",
-        "insights_service/evaluator.py",
-        "insights_service/outputs/**"
+        "t20_insights.py",
+        "cricket_metrics.py",
+        "evaluator.py",
+        "outputs/**"
       ]
     }
   },
